@@ -135,11 +135,6 @@ class ProfilePage extends StatelessWidget {
                       child: SegmentedButton<ThemeMode>(
                         segments: const [
                           ButtonSegment(
-                            value: ThemeMode.system,
-                            label: Text('System'),
-                            icon: Icon(Icons.settings_suggest),
-                          ),
-                          ButtonSegment(
                             value: ThemeMode.light,
                             label: Text('Light'),
                             icon: Icon(Icons.light_mode_outlined),
