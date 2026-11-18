@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -48,10 +49,34 @@ class InkoraApp extends StatefulWidget {
 }
 
 class _InkoraAppState extends State<InkoraApp> {
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
+  static const _themePreferenceKey = 'inkora_theme_mode';
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreThemePreference();
+  }
+
+  Future<void> _restoreThemePreference() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedTheme = preferences.getString(_themePreferenceKey);
+    final restoredMode = savedTheme == 'dark'
+        ? ThemeMode.dark
+        : ThemeMode.light;
+
+    if (!mounted) return;
+    setState(() => _themeMode = restoredMode);
+  }
 
   void changeTheme(ThemeMode mode) {
     setState(() => _themeMode = mode);
+    SharedPreferences.getInstance().then((preferences) {
+      return preferences.setString(
+        _themePreferenceKey,
+        mode == ThemeMode.dark ? 'dark' : 'light',
+      );
+    });
   }
 
   ThemeData makeTheme(Brightness brightness) {
@@ -358,11 +383,6 @@ class _InkoraShellState extends State<InkoraShell> {
               },
               child: Column(
                 children: [
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.system,
-                    secondary: const Icon(Icons.settings_suggest),
-                    title: const Text('System default'),
-                  ),
                   RadioListTile<ThemeMode>(
                     value: ThemeMode.light,
                     secondary: const Icon(Icons.light_mode_outlined),
