@@ -1,4 +1,4 @@
-
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -7,11 +7,11 @@ import 'services/profile_service.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
     super.key,
-    required this.themeMode,
+    required this.themeModeListenable,
     required this.onThemeChanged,
   });
 
-  final ThemeMode themeMode;
+  final ValueListenable<ThemeMode> themeModeListenable;
   final ValueChanged<ThemeMode> onThemeChanged;
 
   @override
@@ -132,27 +132,27 @@ class ProfilePage extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: SegmentedButton<ThemeMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: ThemeMode.system,
-                            label: Text('System'),
-                            icon: Icon(Icons.settings_suggest),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.light,
-                            label: Text('Light'),
-                            icon: Icon(Icons.light_mode_outlined),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.dark,
-                            label: Text('Dark'),
-                            icon: Icon(Icons.dark_mode_outlined),
-                          ),
-                        ],
-                        selected: {themeMode},
-                        onSelectionChanged: (values) {
-                          onThemeChanged(values.first);
+                      child: ValueListenableBuilder<ThemeMode>(
+                        valueListenable: themeModeListenable,
+                        builder: (context, currentTheme, child) {
+                          return SegmentedButton<ThemeMode>(
+                            segments: const [
+                              ButtonSegment<ThemeMode>(
+                                value: ThemeMode.light,
+                                label: Text('Light'),
+                                icon: Icon(Icons.light_mode_outlined),
+                              ),
+                              ButtonSegment<ThemeMode>(
+                                value: ThemeMode.dark,
+                                label: Text('Dark'),
+                                icon: Icon(Icons.dark_mode_outlined),
+                              ),
+                            ],
+                            selected: {currentTheme},
+                            onSelectionChanged: (values) {
+                              onThemeChanged(values.first);
+                            },
+                          );
                         },
                       ),
                     ),

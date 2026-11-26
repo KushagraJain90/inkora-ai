@@ -37,29 +37,83 @@ import 'screens/evaluation_result_screen.dart';
 import 'widgets/app_pull_to_refresh.dart';
 
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await pdfrxFlutterInitialize();
 
-  runApp(const InkoraApp());
+  final prefs = await SharedPreferences.getInstance();
+
+  // Light is the default. Use Dark only if the user previously selected it.
+  final savedTheme = prefs.getString('theme_mode');
+
+  final initialThemeMode = savedTheme == 'dark'
+      ? ThemeMode.dark
+      : ThemeMode.light;
+
+  runApp(
+    InkoraApp(initialThemeMode: initialThemeMode),
+  );
 }
 
 class InkoraApp extends StatefulWidget {
-  const InkoraApp({super.key});
+  const InkoraApp({
+    super.key,
+    required this.initialThemeMode,
+  });
+
+  final ThemeMode initialThemeMode;
 
   @override
   State<InkoraApp> createState() => _InkoraAppState();
 }
 
 class _InkoraAppState extends State<InkoraApp> {
-  ThemeMode _themeMode = ThemeMode.system;
+  late ThemeMode _themeMode;
+
+  late final ValueNotifier<ThemeMode> _themeModeNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _themeMode = widget.initialThemeMode;
+    _themeModeNotifier = ValueNotifier<ThemeMode>(_themeMode);
+  }
 
   void changeTheme(ThemeMode mode) {
-    setState(() => _themeMode = mode);
+    if (mode == _themeMode) return;
+
+    setState(() {
+      _themeMode = mode;
+    });
+
+    // Notify every screen that listens to the theme preference.
+    _themeModeNotifier.value = mode;
+
+    // Persist the user's selection.
+    SharedPreferences.getInstance().then((prefs) {
+      return prefs.setString(
+        'theme_mode',
+        mode == ThemeMode.dark ? 'dark' : 'light',
+      );
+    });
   }
+
+  @override
+  void dispose() {
+    _themeModeNotifier.dispose();
+    super.dispose();
+  }
+
+  // Keep your existing makeTheme() method below this.
 
   ThemeData makeTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
@@ -116,21 +170,6 @@ class _InkoraAppState extends State<InkoraApp> {
 
   @override
   Widget build(BuildContext context) {
-    // return MaterialApp(
-    //   title: 'Inkora AI',
-    //   debugShowCheckedModeBanner: false,
-    //   theme: makeTheme(Brightness.light),
-    //   darkTheme: makeTheme(Brightness.dark),
-    //   themeMode: _themeMode,
-    //   home: InkoraSplashScreen(
-    //     nextScreen: ProfileGate(
-    //       authenticatedHome: InkoraShell(
-    //         themeMode: _themeMode,
-    //         onThemeChanged: changeTheme,
-    //       ),
-    //     ),
-    //   ),
-    // );
 
     return MaterialApp(
       title: 'Inkora AI',
@@ -143,7 +182,7 @@ class _InkoraAppState extends State<InkoraApp> {
       home: InkoraSplashScreen(
         nextScreen: ProfileGate(
           authenticatedHome: InkoraShell(
-            themeMode: _themeMode,
+            themeModeListenable: _themeModeNotifier,
             onThemeChanged: changeTheme,
           ),
         ),
@@ -155,11 +194,11 @@ class _InkoraAppState extends State<InkoraApp> {
 class InkoraShell extends StatefulWidget {
   const InkoraShell({
     super.key,
-    required this.themeMode,
+    required this.themeModeListenable,
     required this.onThemeChanged,
   });
 
-  final ThemeMode themeMode;
+  final ValueListenable<ThemeMode> themeModeListenable;
   final ValueChanged<ThemeMode> onThemeChanged;
 
   @override
@@ -280,7 +319,7 @@ class _InkoraShellState extends State<InkoraShell> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProfilePage(
-                        themeMode: widget.themeMode,
+                        themeModeListenable: widget.themeModeListenable,
                         onThemeChanged: widget.onThemeChanged,
                       ),
                     ),
@@ -327,46 +366,51 @@ class _InkoraShellState extends State<InkoraShell> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            RadioGroup<ThemeMode>(
-              groupValue: widget.themeMode,
-              onChanged: (mode) {
-                if (mode != null) {
-                  widget.onThemeChanged(mode);
-                  Navigator.pop(sheetContext);
-                }
-              },
-              child: Column(
-                children: [
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.system,
-                    secondary: const Icon(Icons.settings_suggest),
-                    title: const Text('System default'),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.light,
-                    secondary: const Icon(Icons.light_mode_outlined),
-                    title: const Text('Light mode'),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.dark,
-                    secondary: const Icon(Icons.dark_mode_outlined),
-                    title: const Text('Dark mode'),
-                  ),
-                ],
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Appearance',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: 16),
+
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: widget.themeModeListenable,
+                builder: (context, currentTheme, child) {
+                  return RadioGroup<ThemeMode>(
+                    groupValue: currentTheme,
+                    onChanged: (mode) {
+                      if (mode != null) {
+                        widget.onThemeChanged(mode);
+                        Navigator.pop(sheetContext);
+                      }
+                    },
+                    child: const Column(
+                      children: [
+                        RadioListTile<ThemeMode>(
+                          value: ThemeMode.light,
+                          secondary: Icon(Icons.light_mode_outlined),
+                          title: Text('Light mode'),
+                        ),
+                        RadioListTile<ThemeMode>(
+                          value: ThemeMode.dark,
+                          secondary: Icon(Icons.dark_mode_outlined),
+                          title: Text('Dark mode'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
