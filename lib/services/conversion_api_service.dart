@@ -101,14 +101,34 @@ class ConversionApiService {
     }
 
     final appDirectory = await getApplicationDocumentsDirectory();
-    final outputDirectory = Directory(
+
+    final convertedRoot = Directory(
       '${appDirectory.path}/InkoraAI/Converted',
     );
 
-    await outputDirectory.create(recursive: true);
+    await convertedRoot.create(recursive: true);
+
+// Give every conversion its own directory.
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+
+    var outputDirectory = Directory(
+      '${convertedRoot.path}/$timestamp',
+    );
+
+    var suffix = 1;
+
+    while (await outputDirectory.exists()) {
+      outputDirectory = Directory(
+        '${convertedRoot.path}/${timestamp}_$suffix',
+      );
+      suffix++;
+    }
+
+    await outputDirectory.create();
 
     final wordPath =
         '${outputDirectory.path}/Inkora_AI_Converted.docx';
+
     final pdfPath =
         '${outputDirectory.path}/Inkora_AI_Converted.pdf';
 
